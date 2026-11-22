@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weekly schedule maker (free): your 168 hours, real free time per day, clashes flagged</title>
+<meta name="description" content="Free weekly schedule maker and time budget: enter your fixed blocks (sleep, work, commute, school run, gym) with their days and times, overnight blocks included. It draws the week, adds up the hours of each block out of 168, shows the free hours and the longest free stretch of every day, and flags the blocks that clash. Print and CSV. Runs in your browser.">
+<style>
+:root{--ink:#1d1a24;--paper:#f3efe6;--navy:#23395b;--rust:#b2542b;--rule:#d8d0bd}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.6 Georgia,"Iowan Old Style",serif}
+main{max-width:800px;margin:0 auto;padding:36px 18px 60px}
+h1{font-size:1.9rem;line-height:1.15;margin:0 0 .4em;color:var(--navy)}
+h2{font-size:1.2rem;margin:1.8em 0 .5em;color:var(--navy)}
+a{color:var(--navy)}
+.box{background:#fff;border:1px solid var(--rule);border-radius:8px;padding:14px}
+.blk{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,.9fr) minmax(0,.9fr) 34px;gap:8px;margin-bottom:8px;align-items:end}
+.fund{display:grid;grid-template-columns:2fr 1.2fr 1.2fr 34px;gap:8px;margin-bottom:8px;align-items:end}
+.blk label,.fund label,.row label{font-size:.85rem;display:flex;flex-direction:column;gap:3px;min-width:0}
+input,select{font:inherit;padding:7px;border:1px solid var(--rule);border-radius:5px;background:#fff;width:100%;min-width:0}
+.x{font:inherit;border:1px solid var(--rule);background:#fff;border-radius:5px;height:40px;cursor:pointer;color:var(--rust)}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:12px}
+button.add,.dl button{font:inherit;font-weight:bold;padding:9px 14px;border:2px solid var(--navy);border-radius:6px;background:#fff;color:var(--navy);cursor:pointer}
+.dl{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}
+.dl button.main{background:var(--navy);color:#fff}
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:16px 0}
+.sum div{background:#fff;border-top:4px solid var(--rust);padding:10px 14px;border-radius:4px}
+.sum b{display:block;font-size:1.2rem;color:var(--navy)}
+.warn{background:#fbe9e1;border-left:4px solid var(--rust);padding:8px 12px;border-radius:4px;margin:10px 0}
+.res{width:100%;border-collapse:collapse;background:#fff;font-size:.93rem}
+.res th,.res td{border-bottom:1px solid var(--rule);padding:6px 8px;text-align:right}
+.res th:first-child,.res td:first-child{text-align:left}
+.scroll{overflow-x:auto}
+.ok{color:#2f6b3a;font-weight:bold}.bad{color:var(--rust);font-weight:bold}
+@media print{.box,.dl,.add,.np{display:none}body{background:#fff}}
+.dys{display:flex;flex-wrap:wrap;gap:4px;grid-column:1/-1;margin-top:-2px}.dys label{flex-direction:row;align-items:center;gap:3px;font-size:.8rem}.dys input{width:auto}
+.grid{display:grid;grid-template-columns:38px repeat(7,1fr);gap:2px;background:#fff;border:1px solid var(--rule);border-radius:6px;padding:6px;font-size:.72rem}
+.col{position:relative;height:480px;background:repeating-linear-gradient(#fff 0 39px,#eee6d6 39px 40px)}.hr{position:relative;height:480px;color:#5f5a66}.hr span{position:absolute;right:3px}
+.ev{position:absolute;left:1px;right:1px;border-radius:3px;color:#fff;overflow:hidden;padding:0 2px;line-height:1.2;opacity:.88}.gh{text-align:center;font-weight:bold}
+small{color:#5f5a66}
+@media(max-width:620px){.blk{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;padding-bottom:8px;border-bottom:1px solid var(--rule)}.blk label:first-child,.blk .x,.blk .dys{grid-column:1/-1}.blk .x{height:34px}.blk{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,.9fr) minmax(0,.9fr) 34px;gap:8px;margin-bottom:8px;align-items:end}
+.fund{grid-template-columns:1fr 1fr;padding-bottom:8px;border-bottom:1px solid var(--rule)}.fund label:first-child,.fund .x{grid-column:1/-1}.fund .x{height:34px}.res{font-size:.85rem}.res th,.res td{padding:5px 4px}}
+</style>
+<link rel="canonical" href="https://ricco020.github.io/weekly-schedule-time-budget/">
+</head>
+<body>
+<main>
+<h1>Weekly schedule maker: where your 168 hours go</h1>
+<p>A week has 168 hours. Put in the blocks that are not negotiable (sleep, work, commute, meals, the school run) with their days and times, and the page draws the week, totals each block, and shows what is really left: free hours per day and, more useful, the longest free stretch of each day, which is where a workout or an hour of focused work can fit. Blocks that overlap are flagged with the minutes they share.</p>
+<div class="box">
+<div id="blks"></div>
+<button class="add" id="addb" type="button">+ Add a block</button>
+</div>
+<div id="out"></div>
+<div class="dl"><button class="main" id="csv" type="button">Download the week (CSV)</button><button id="pr" type="button">Print this week</button></div>
+<h2>How the hours are counted</h2>
+<p>Every block runs from its start time to its end time on each day ticked. When the end is earlier than the start (sleep from 23:00 to 07:00) the block runs past midnight into the next day, and Sunday night runs into Monday morning. Same start and end means 24 hours. Totals per block count each of its minutes, so two blocks that overlap are both counted in their own total, while the busy and free hours of a day count a minute once, whichever block it belongs to. That is why the clash list matters: it shows the minutes counted twice.</p>
+<h2>Why the longest free stretch</h2>
+<p>Four free hours made of eight half-hours do not hold a gym session or a deep work block. The longest free stretch is the longest run of minutes with no block, inside the day from midnight to midnight. If it is under an hour on most weekdays, the fix is to move one block, not to find more time.</p>
+<h2>Limits</h2>
+<p>Fixed blocks only: the page does not schedule tasks for you. Times go in 15-minute steps or finer, there is no time zone handling, and nothing is sent anywhere: the week is stored in this browser only.</p>
+<h2>Keep it on paper</h2>
+<p>Once the fixed blocks are known, the week itself (appointments by day, three goals, quick and deep tasks, a Sunday review that carries over) fits on a <a href="https://tidysheets.shop/p/weekly-planner-printable">printable weekly planner</a>, one spread per week.</p>
+<p><small>Free tool, no account, no tracking. Source on <a href="https://github.com/ricco020/weekly-schedule-time-budget">GitHub</a>. More free planners on <a href="https://ricco020.github.io/">ricco020.github.io</a>.</small></p>
+</main>
+<script>
+(function(g){
+const W=10080;
+function hm(s){const[h,m]=String(s).split(':').map(Number);return h*60+m}
+function segs(b){const out=[],s=hm(b.start),e=hm(b.end);let len=e-s;if(len<=0)len+=1440;
+ for(const d of b.days){let a=(d*1440+s)%W,l=len;while(l>0){const take=Math.min(l,W-a);out.push([a,a+take]);l-=take;a=0}}return out}
+function inter(x,y){let t=0;for(const[a,b]of x)for(const[c,d]of y){const lo=Math.max(a,c),hi=Math.min(b,d);if(hi>lo)t+=hi-lo}return t}
+function week(blocks){
+ const S=blocks.map(segs),per=blocks.map((b,i)=>S[i].reduce((t,[a,c])=>t+c-a,0)/60);
+ const days=[];
+ for(let d=0;d<7;d++){const lo=d*1440,hi=lo+1440,cl=[];
+  S.forEach(ss=>ss.forEach(([a,b])=>{const x=Math.max(a,lo),y=Math.min(b,hi);if(y>x)cl.push([x,y])}));
+  cl.sort((p,q)=>p[0]-q[0]);let busy=0,cur=lo,end=lo,longest=0;
+  for(const[a,b]of cl){if(a>end){busy+=end-cur;longest=Math.max(longest,a-end);cur=a;end=b}else end=Math.max(end,b)}
+  busy+=end-cur;longest=Math.max(longest,hi-end);days.push({busy:busy/60,free:(1440-busy)/60,longestFree:longest/60})}
+ const overlaps=[];for(let i=0;i<S.length;i++)for(let j=i+1;j<S.length;j++){const m=inter(S[i],S[j]);if(m>0)overlaps.push({a:i,b:j,minutes:m})}
+ const busy=days.reduce((t,x)=>t+x.busy,0);
+ return{perBlock:per,days,overlaps,busy,free:168-busy}}
+g.week=week;g.segs=segs;g.hm=hm;if(typeof module!=='undefined')module.exports={week,segs,hm};
+})(typeof window!=='undefined'?window:globalThis);
+
+</script>
+<script>
+const $=id=>document.getElementById(id),K='weekly-schedule-time-budget-v1',DN=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],COL=['#23395b','#b2542b','#2f6b3a','#7a4b8c','#8a6d1f','#1f6f78','#a23b5a','#4f5d2f'];
+let st={b:[['Sleep','23:00','07:00',[0,1,2,3,4,5,6]],['Work','09:00','17:30',[0,1,2,3,4]],['Commute','08:15','09:00',[0,1,2,3,4]],['Commute home','17:30','18:15',[0,1,2,3,4]],['Dinner and kids','18:30','20:30',[0,1,2,3,4,5,6]],['Football practice','10:00','11:30',[5]]]};
+try{const s=JSON.parse(localStorage.getItem(K));if(s&&s.b)st=s}catch(e){}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const h=v=>{const m=Math.round(v*60);return Math.floor(m/60)+' h'+(m%60?' '+String(m%60).padStart(2,'0'):'')};
+function rows(){$('blks').innerHTML=st.b.map((b,i)=>`<div class="blk"><label>Block<input data-b="${i}" data-k="0" value="${esc(b[0])}"></label><label>From<input type="time" step="300" data-b="${i}" data-k="1" value="${b[1]}"></label><label>To<input type="time" step="300" data-b="${i}" data-k="2" value="${b[2]}"></label><button class="x" data-db="${i}" type="button" aria-label="Remove">&times;</button><div class="dys">${DN.map((d,j)=>`<label><input type="checkbox" data-bd="${i}" data-d="${j}"${b[3].includes(j)?' checked':''}>${d}</label>`).join('')}</div></div>`).join('')}
+function draw(){
+ try{localStorage.setItem(K,JSON.stringify(st))}catch(e){}
+ const ok=st.b.map((b,i)=>[b,i]).filter(([b])=>b[1]&&b[2]&&b[3].length);
+ const r=week(ok.map(([b])=>({start:b[1],end:b[2],days:b[3]})));
+ const nm=k=>esc(ok[k][0][0]||'Block '+(ok[k][1]+1));
+ let o=`<div class="sum"><div>Fixed blocks<b>${h(r.busy)}</b><small>of the 168 hours of the week</small></div><div>Free<b>${h(r.free)}</b><small>${h(r.free/7)} a day on average</small></div><div>Tightest day: longest free stretch<b>${r.days.length?h(Math.min(...r.days.map(d=>d.longestFree))):'-'}</b><small>${DN[r.days.map(d=>d.longestFree).indexOf(Math.min(...r.days.map(d=>d.longestFree)))]}</small></div></div>`;
+ if(r.overlaps.length)o+='<div class="warn">Clashes: '+r.overlaps.map(x=>`${nm(x.a)} and ${nm(x.b)} share ${h(x.minutes/60)} a week`).join(', ')+'.</div>';
+ o+='<h2>The week</h2><div class="grid"><div></div>'+DN.map(d=>`<div class="gh">${d}</div>`).join('')+'<div class="hr">'+[0,3,6,9,12,15,18,21].map(x=>`<span style="top:${x*20}px">${x}:00</span>`).join('')+'</div>';
+ const cols=DN.map(()=>[]);ok.forEach(([b],k)=>segs({start:b[1],end:b[2],days:b[3]}).flatMap(([a,c])=>{const o=[];while(a<c){const n=Math.min(c,(Math.floor(a/1440)+1)*1440);o.push([a,n]);a=n}return o}).forEach(([a,c])=>{const d=Math.floor(a/1440);cols[d].push(`<div class="ev" style="top:${(a-d*1440)/3}px;height:${(c-a)/3}px;background:${COL[k%COL.length]}" title="${nm(k)}">${nm(k)}</div>`)}));
+ o+=cols.map(c=>`<div class="col">${c.join('')}</div>`).join('')+'</div>';
+ o+='<h2>Day by day</h2><div class="scroll"><table class="res"><tr><th>Day</th><th>Busy</th><th>Free</th><th>Longest free stretch</th></tr>'+r.days.map((d,i)=>`<tr><td>${DN[i]}</td><td>${h(d.busy)}</td><td>${h(d.free)}</td><td>${h(d.longestFree)}</td></tr>`).join('')+'</table></div>';
+ o+='<h2>Per block</h2><div class="scroll"><table class="res"><tr><th>Block</th><th>Hours a week</th><th>Share of 168 h</th></tr>'+r.perBlock.map((v,k)=>`<tr><td>${nm(k)}</td><td>${h(v)}</td><td>${(v/168*100).toFixed(1)} %</td></tr>`).join('')+'</table></div>';
+ $('out').innerHTML=o;
+ window._csv=['Day,Busy hours,Free hours,Longest free stretch (hours)'].concat(r.days.map((d,i)=>[DN[i],d.busy.toFixed(2),d.free.toFixed(2),d.longestFree.toFixed(2)].join(','))).concat(['','Block,Hours a week']).concat(r.perBlock.map((v,k)=>['"'+(ok[k][0][0]||'Block').replace(/"/g,'""')+'"',v.toFixed(2)].join(','))).join('\n');
+}
+document.addEventListener('input',e=>{const t=e.target;
+ if(t.dataset.b!==undefined)st.b[t.dataset.b][t.dataset.k]=t.value;
+ else if(t.dataset.bd!==undefined){const a=st.b[t.dataset.bd][3],d=+t.dataset.d;if(t.checked){if(!a.includes(d))a.push(d);a.sort()}else a.splice(a.indexOf(d),1)}else return;draw()});
+document.addEventListener('click',e=>{const t=e.target;
+ if(t.id==='addb'){st.b.push(['','12:00','13:00',[0,1,2,3,4]]);rows();draw()}else if(t.dataset.db!==undefined){st.b.splice(+t.dataset.db,1);rows();draw()}
+ else if(t.id==='pr')window.print();
+ else if(t.id==='csv'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([window._csv],{type:'text/csv'}));a.download='weekly-time-budget.csv';a.click()}});
+rows();draw();
+</script>
+</body>
+</html>
